@@ -42,6 +42,11 @@
 #define LDC1614_REG_DATA0_LSB 0x01  // Register address for DATA_LSB_CH0
 #define LDC1614_REG_DATA1_MSB 0x02  // Register address for DATA_MSB_CH1
 #define LDC1614_REG_DATA1_LSB 0x03  // Register address for DATA_LSB_CH1
+#define LDC1614_REG_DATA2_MSB 0x04  // Register address for DATA_MSB_CH2
+#define LDC1614_REG_DATA2_LSB 0x05  // Register address for DATA_LSB_CH2
+#define LDC1614_REG_DATA3_MSB 0x06  // Register address for DATA_MSB_CH3
+#define LDC1614_REG_DATA3_LSB 0x07  // Register address for DATA_LSB_CH3
+
 #define LDC1614_CH0_OFFSET 0x0C
 #define LDC1614_CH1_OFFSET 0x0D
 #define LDC1614_CH0_FIN_DIVIDER 0x14
