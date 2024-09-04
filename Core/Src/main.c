@@ -94,14 +94,45 @@ void LDC1614_ReadRegister(uint8_t reg, uint8_t* buffer, uint16_t size) {
     HAL_I2C_Mem_Read(&hi2c1, LDC1614_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, buffer, size, HAL_MAX_DELAY);
 }
 
+// Function to transform hex to dec
+int hex_to_dec(uint16_t hex) {
+	char hexString_CH0[5];
+	snprintf(hexString_CH0, sizeof(hexString_CH0), "%04X", hex);
+	int integerValue = (int)strtol(hexString_CH0, NULL, 16);
+	return integerValue;
+}
+
 // Function to transmit data via UART
-void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t integerValue_MSB_CH0, uint16_t MSB_CH1, uint16_t LSB_CH1, uint16_t integerValue_MSB_CH1) {
+void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t MSB_CH1, uint16_t LSB_CH1, uint16_t CH0_OFFSET, uint16_t CH0_FIN_DIVIDER) {
     static uint32_t transmit_count = 0;  // Counter to keep track of transmitted data instances
-    char msg[200];  // Buffer to hold the transmitted message, size increased to accommodate the count
+    char msg[1000];  // Buffer to hold the transmitted message, size increased to accommodate the count
     transmit_count++;  // Increment the counter each time data is transmitted
 
+    uint16_t LSB_CH0_masked = LSB_CH0 & 0xFFF; // because LSB is only 12 bits
+    uint16_t LSB_CH1_masked = LSB_CH1 & 0xFFF; // because LSB is only 12 bits
+    uint16_t CH0_FIN_DIVIDER_masked = CH0_FIN_DIVIDER & 0xFF; // Only the first byte represents the FIN divider.
+
+
+    // Data transform
+    int integerValue_MSB_CH0 = hex_to_dec(MSB_CH0);
+    int integerValue_LSB_CH0 = hex_to_dec(LSB_CH0_masked);
+    int integerValue_MSB_CH1 = hex_to_dec(MSB_CH1);
+    int integerValue_LSB_CH1 = hex_to_dec(LSB_CH1_masked);
+    int integer_CH0_OFFSET = hex_to_dec(CH0_OFFSET);
+    int integer_CH0_FIN_DIVIDER = hex_to_dec(CH0_FIN_DIVIDER_masked);
+
+    int DATA_CH0 = integerValue_MSB_CH0 * 4096 + integerValue_LSB_CH0;
+    int DATA_CH1 = integerValue_MSB_CH1 * 4096 + integerValue_LSB_CH1;
+
+    // Calculate sensor frequency
+    // uint16_t f_sensor_CH0 = integer_CH0_DIVIDER * 40000000 * ((DATA_CH0 / 268435456) + (integer_CH0_OFFSET / 65536));
+    //uint16_t f_sensor_CH0 = 40000000 * (DATA_CH0 / (1 << 28));
+
+
+    //int f_sensor_CH1 = integer_reg_CH1_FIN_DIVIDER * 40000000 * ((DATA_CH1 / 268435456) + (integer_reg_CH1_OFFSET / 65536));
+
     // Format the data as a hexadecimal string along with the counter
-    int len = snprintf(msg, sizeof(msg), "CH0 - MSB: 0x%X, LSB: 0x%X, MSB_Integer: %d | CH1 - MSB: 0x%X, LSB: 0x%X, MSB_Integer: %d. Cycle: %lu\r\n", MSB_CH0, LSB_CH0, integerValue_MSB_CH0, MSB_CH1, LSB_CH1, integerValue_MSB_CH1, transmit_count);
+    int len = snprintf(msg, sizeof(msg), "CH0 - MSB: 0x%X, LSB: 0x%X, MSB_int: %d, LSB_int: %d, DATA: %d | CH1 - MSB: 0x%X, LSB: 0x%X, MSB_int: %d, LSB_int: %d, DATA: %d, OffSet: %d, Divider: %d. Cycle: %lu\r\n", MSB_CH0, LSB_CH0, integerValue_MSB_CH0, integerValue_LSB_CH0, DATA_CH0, MSB_CH1, LSB_CH1, integerValue_MSB_CH1, integerValue_LSB_CH1, DATA_CH1, integer_CH0_OFFSET, integer_CH0_FIN_DIVIDER, transmit_count);
 
     // Transmit the formatted message
     HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
@@ -143,13 +174,6 @@ void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t integerValue_MSB
 //    }
 //    return bits;
 //}
-
-int hex_to_dec(uint16_t hex) {
-	char hexString_CH0[5];
-	snprintf(hexString_CH0, sizeof(hexString_CH0), "%04X", hex);
-	int integerValue = (int)strtol(hexString_CH0, NULL, 16);
-	return integerValue;
-}
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -202,23 +226,18 @@ int main(void)
     uint16_t LSB_CH0= (reg_data_LSB_CH0[0] << 8) | reg_data_LSB_CH0[1];
     uint16_t MSB_CH1 = (reg_data_MSB_CH1[0] << 8) | reg_data_MSB_CH1[1];
     uint16_t LSB_CH1= (reg_data_LSB_CH1[0] << 8) | reg_data_LSB_CH1[1];
+    uint16_t CH0_OFFSET= (reg_CH0_OFFSET[0] << 8) | reg_CH0_OFFSET[1];
+    uint16_t CH0_FIN_DIVIDER= (reg_CH0_FIN_DIVIDER[0] << 8) | reg_CH0_FIN_DIVIDER[1];
 
-	// Convert the 16-bit value to a hexadecimal string
-	char hexString_CH0[5]; // 4 digits + null terminator
-	snprintf(hexString_CH0, sizeof(hexString_CH0), "%04X", MSB_CH0);
-	char hexString_CH1[5]; // 4 digits + null terminator
-	snprintf(hexString_CH1, sizeof(hexString_CH1), "%04X", MSB_CH1);
-
-    // Convert the hexadecimal string to an integer
+    // Data transform
     int integerValue_MSB_CH0 = hex_to_dec(MSB_CH0);
-    int integerValue_MSB_CH1 = (int)strtol(hexString_CH1, NULL, 16);
-    //unsigned long fullHexNumber = ((unsigned long)MSB_CH0 << 12) | (LSB_CH0 & 0xFFF);
+    int integerValue_MSB_CH1 = hex_to_dec(MSB_CH1);
 
-    // int DATA0 = integerValue_MSB_CH0 * 4096 +
+
     // Transmit the register value via UART
-    Transmit_Data(MSB_CH0, LSB_CH0, integerValue_MSB_CH0, MSB_CH1, LSB_CH1, integerValue_MSB_CH1);
+    Transmit_Data(MSB_CH0, LSB_CH0, MSB_CH1, LSB_CH1, CH0_OFFSET, CH0_FIN_DIVIDER);
 
-    if (integerValue_MSB_CH0 > 310 || integerValue_MSB_CH1 > 310 ){
+    if (integerValue_MSB_CH0 > 398 || integerValue_MSB_CH1 > 310 ){
     	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
     }else{
     	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
