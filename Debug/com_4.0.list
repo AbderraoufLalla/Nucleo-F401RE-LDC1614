@@ -39,13 +39,13 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  17 .debug_line   0000bdbb  00000000  00000000  0002721e  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_str    00087875  00000000  00000000  00032fd9  2**0
+ 18 .debug_str    000878b1  00000000  00000000  00032fd9  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .comment      00000043  00000000  00000000  000ba84e  2**0
+ 19 .comment      00000043  00000000  00000000  000ba88a  2**0
                   CONTENTS, READONLY
- 20 .debug_frame  00002b2c  00000000  00000000  000ba894  2**2
+ 20 .debug_frame  00002b2c  00000000  00000000  000ba8d0  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 21 .debug_line_str 00000063  00000000  00000000  000bd3c0  2**0
+ 21 .debug_line_str 00000063  00000000  00000000  000bd3fc  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -682,12 +682,12 @@ int main(void)
     LDC1614_ReadRegister(LDC1614_REG_DATA0_MSB, reg_data_MSB_CH0, 2);
  8000796:	2202      	movs	r2, #2
  8000798:	4947      	ldr	r1, [pc, #284]	@ (80008b8 <main+0x13c>)
- 800079a:	2004      	movs	r0, #4
+ 800079a:	2000      	movs	r0, #0
  800079c:	f7ff fee8 	bl	8000570 <LDC1614_ReadRegister>
     LDC1614_ReadRegister(LDC1614_REG_DATA0_LSB, reg_data_LSB_CH0, 2);
  80007a0:	2202      	movs	r2, #2
  80007a2:	4946      	ldr	r1, [pc, #280]	@ (80008bc <main+0x140>)
- 80007a4:	2005      	movs	r0, #5
+ 80007a4:	2001      	movs	r0, #1
  80007a6:	f7ff fee3 	bl	8000570 <LDC1614_ReadRegister>
     LDC1614_ReadRegister(LDC1614_REG_DATA1_MSB, reg_data_MSB_CH1, 2);
  80007aa:	2202      	movs	r2, #2
@@ -7097,6 +7097,11 @@ static void UART_EndRxTransfer(UART_HandleTypeDef *huart)
  8002c6e:	681b      	ldr	r3, [r3, #0]
  8002c70:	330c      	adds	r3, #12
  8002c72:	637b      	str	r3, [r7, #52]	@ 0x34
+ */
+__STATIC_FORCEINLINE uint32_t __LDREXW(volatile uint32_t *addr)
+{
+    uint32_t result;
+
    __ASM volatile ("ldrex %0, %1" : "=r" (result) : "Q" (*addr) );
  8002c74:	6b7b      	ldr	r3, [r7, #52]	@ 0x34
  8002c76:	e853 3f00 	ldrex	r3, [r3]
@@ -7111,6 +7116,11 @@ static void UART_EndRxTransfer(UART_HandleTypeDef *huart)
  8002c8a:	6cfa      	ldr	r2, [r7, #76]	@ 0x4c
  8002c8c:	643a      	str	r2, [r7, #64]	@ 0x40
  8002c8e:	63fb      	str	r3, [r7, #60]	@ 0x3c
+ */
+__STATIC_FORCEINLINE uint32_t __STREXW(uint32_t value, volatile uint32_t *addr)
+{
+   uint32_t result;
+
    __ASM volatile ("strex %0, %2, %1" : "=&r" (result), "=Q" (*addr) : "r" (value) );
  8002c90:	6bf9      	ldr	r1, [r7, #60]	@ 0x3c
  8002c92:	6c3a      	ldr	r2, [r7, #64]	@ 0x40

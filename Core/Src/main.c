@@ -47,6 +47,8 @@
 #define LDC1614_CH0_FIN_DIVIDER 0x14
 #define LDC1614_CH1_FIN_DIVIDER 0x15
 
+// THIS IS YOUR FIRST BRANCH
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/

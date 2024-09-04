@@ -60,8 +60,8 @@ all: main-build
 main-build: com_4.0.elf secondary-outputs
 
 # Tool invocations
-com_4.0.elf com_4.0.map: $(OBJS) $(USER_OBJS) C:\Users\lalaa\STM32CubeIDE\workspace_1.16.0\com_4.0\STM32F401RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "com_4.0.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\lalaa\STM32CubeIDE\workspace_1.16.0\com_4.0\STM32F401RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="com_4.0.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+com_4.0.elf com_4.0.map: $(OBJS) $(USER_OBJS) C:\Users\lalaa\Documents\GitHub\Nucleo-F401RE-LDC1614\STM32F401RETX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "com_4.0.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\lalaa\Documents\GitHub\Nucleo-F401RE-LDC1614\STM32F401RETX_FLASH.ld" --specs=nosys.specs -Wl,-Map="com_4.0.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
