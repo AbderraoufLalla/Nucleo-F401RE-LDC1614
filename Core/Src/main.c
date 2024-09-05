@@ -124,6 +124,7 @@ static void MX_I2C1_Init(void);
   * @retval int
   */
 
+
 // Function to read a register from LDC1614
 void LDC1614_ReadRegister(uint8_t reg, uint8_t* buffer, uint16_t size) {
     HAL_I2C_Mem_Read(&hi2c1, LDC1614_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, buffer, size, HAL_MAX_DELAY);
@@ -141,23 +142,30 @@ int hex_to_dec(uint16_t hex) {
 	return integerValue;
 }
 
+// Reset the device
+void LDC1614_reset() {
+    uint8_t reg_reset = 0x1C;              // Register address to reset the LDC1614
+    uint8_t buffer_reset=0x8000;           // The reset command
+    LDC1614_WriteRegister(reg_reset, buffer_reset, 2);
+}
+
 // Function to transmit data via UART
 void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t CH0_FIN_DIVIDER, uint16_t CH0_OFFSET, uint16_t MSB_CH1, uint16_t LSB_CH1, uint16_t CH1_FIN_DIVIDER, uint16_t CH1_OFFSET, uint16_t MSB_CH2, uint16_t LSB_CH2, uint16_t CH2_FIN_DIVIDER, uint16_t CH2_OFFSET, uint16_t MSB_CH3, uint16_t LSB_CH3, uint16_t CH3_FIN_DIVIDER, uint16_t CH3_OFFSET) {
     static uint32_t transmit_count = 0;  // Counter to keep track of transmitted data instances
     char msg[1000];  // Buffer to hold the transmitted message, size increased to accommodate the count
     transmit_count++;  // Increment the counter each time data is transmitted
 
-    uint16_t LSB_CH0_masked = LSB_CH0 & 0x0FFF; // because LSB is only 12 bits
-    uint16_t LSB_CH1_masked = LSB_CH1 & 0x0FFF; // because LSB is only 12 bits
-    //uint16_t LSB_CH2_masked = LSB_CH2 & 0xFFF; // because LSB is only 12 bits
-    //uint16_t LSB_CH3_masked = LSB_CH3 & 0xFFF; // because LSB is only 12 bits
+    uint16_t MSB_CH0_masked = MSB_CH0 & 0x0FFF; // because LSB is only 12 bits
+    uint16_t MSB_CH1_masked = MSB_CH1 & 0x0FFF; // because LSB is only 12 bits
+    uint16_t MSB_CH2_masked = MSB_CH2 & 0xFFF; // because LSB is only 12 bits
+    uint16_t MSB_CH3_masked = MSB_CH3 & 0xFFF; // because LSB is only 12 bits
 
 
 
-    uint16_t CH0_FIN_DIVIDER_masked = CH0_FIN_DIVIDER & 0x00FF; // Only the first 2 bytes represents the FIN divider.
-    uint16_t CH1_FIN_DIVIDER_masked = CH1_FIN_DIVIDER & 0x00FF; // Only the first 2 bytes represents the FIN divider.
-    uint16_t CH2_FIN_DIVIDER_masked = CH2_FIN_DIVIDER & 0x00FF; // Only the first 2 bytes represents the FIN divider.
-    uint16_t CH3_FIN_DIVIDER_masked = CH3_FIN_DIVIDER & 0x00FF; // Only the first 2 bytes represents the FIN divider.
+    uint16_t CH0_FIN_DIVIDER_masked = CH0_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
+    uint16_t CH1_FIN_DIVIDER_masked = CH1_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
+    uint16_t CH2_FIN_DIVIDER_masked = CH2_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
+    uint16_t CH3_FIN_DIVIDER_masked = CH3_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
 
 
 
@@ -180,7 +188,7 @@ void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t CH0_FIN_DIVIDER,
     //int f_sensor_CH1 = integer_reg_CH1_FIN_DIVIDER * 40000000 * ((DATA_CH1 / 268435456) + (integer_reg_CH1_OFFSET / 65536));
 
     // Format the data as a hexadecimal string along with the counter
-    int len = snprintf(msg, sizeof(msg), "CH0 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH1 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH2 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH3 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d - Cycle: %d \r\n", MSB_CH0, LSB_CH0, CH0_FIN_DIVIDER_masked, CH0_OFFSET, MSB_CH1, LSB_CH1, CH1_FIN_DIVIDER_masked, CH1_OFFSET, MSB_CH2, LSB_CH2, CH2_FIN_DIVIDER_masked, CH2_OFFSET, MSB_CH3, LSB_CH3, CH3_FIN_DIVIDER_masked, CH3_OFFSET, transmit_count);
+    int len = snprintf(msg, sizeof(msg), "CH0 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH1 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH2 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH3 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d - Cycle: %ld \r\n", MSB_CH0_masked, LSB_CH0, CH0_FIN_DIVIDER_masked, CH0_OFFSET, MSB_CH1_masked, LSB_CH1, CH1_FIN_DIVIDER_masked, CH1_OFFSET, MSB_CH2_masked, LSB_CH2, CH2_FIN_DIVIDER_masked, CH2_OFFSET, MSB_CH3_masked, LSB_CH3, CH3_FIN_DIVIDER_masked, CH3_OFFSET, transmit_count);
 
     // Transmit the formatted message
     HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
@@ -249,9 +257,10 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-
-  /* USER CODE END 2 */
+  LDC1614_reset();
+  HAL_Delay(100);
   LDC1614_WriteRegister(config_reg, config_data_4_Channels, 2);
+  /* USER CODE END 2 */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -316,7 +325,6 @@ int main(void)
     };
     // Add a delay or condition to control the transmission frequency
     HAL_Delay(100);  // Delay for 1 second, adjust as needed
-
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
