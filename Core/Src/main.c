@@ -37,20 +37,27 @@
 // Define the I2C address of LDC1614 (7-bit address, shift left for 8-bit format)
 #define LDC1614_ADDRESS (0x2A << 1)  // Adjust based on your sensor's I2C address configuration
 
-// Define the register to read
-#define LDC1614_REG_DATA0_MSB 0x00  // Register address for DATA_MSB_CH0
-#define LDC1614_REG_DATA0_LSB 0x01  // Register address for DATA_LSB_CH0
-#define LDC1614_REG_DATA1_MSB 0x02  // Register address for DATA_MSB_CH1
-#define LDC1614_REG_DATA1_LSB 0x03  // Register address for DATA_LSB_CH1
-#define LDC1614_REG_DATA2_MSB 0x04  // Register address for DATA_MSB_CH2
-#define LDC1614_REG_DATA2_LSB 0x05  // Register address for DATA_LSB_CH2
-#define LDC1614_REG_DATA3_MSB 0x06  // Register address for DATA_MSB_CH3
-#define LDC1614_REG_DATA3_LSB 0x07  // Register address for DATA_LSB_CH3
+// Define Channels registers to read
+#define LDC1614_REG_DATA0_MSB 0x00  // Register address for DATA_MSB_CH0 // Read Only
+#define LDC1614_REG_DATA0_LSB 0x01  // Register address for DATA_LSB_CH0 // Read Only
+#define LDC1614_REG_DATA1_MSB 0x02  // Register address for DATA_MSB_CH1 // Read Only
+#define LDC1614_REG_DATA1_LSB 0x03  // Register address for DATA_LSB_CH1 // Read Only
+#define LDC1614_REG_DATA2_MSB 0x04  // Register address for DATA_MSB_CH2 // Read Only
+#define LDC1614_REG_DATA2_LSB 0x05  // Register address for DATA_LSB_CH2 // Read Only
+#define LDC1614_REG_DATA3_MSB 0x06  // Register address for DATA_MSB_CH3 // Read Only
+#define LDC1614_REG_DATA3_LSB 0x07  // Register address for DATA_LSB_CH3 // Read Only
 
-#define LDC1614_CH0_OFFSET 0x0C
-#define LDC1614_CH1_OFFSET 0x0D
-#define LDC1614_CH0_FIN_DIVIDER 0x14
-#define LDC1614_CH1_FIN_DIVIDER 0x15
+// Define Channels offsets to read
+#define LDC1614_CH0_OFFSET 0x0C // Read & Write
+#define LDC1614_CH1_OFFSET 0x0D // Read & Write
+#define LDC1614_CH2_OFFSET 0x0E // Read & Write
+#define LDC1614_CH3_OFFSET 0x0F // Read & Write
+
+
+#define LDC1614_CH0_FIN_DIVIDER 0x14 // Read & Write
+#define LDC1614_CH1_FIN_DIVIDER 0x15 // Read & Write
+#define LDC1614_CH2_FIN_DIVIDER 0x16 // Read & Write
+#define LDC1614_CH3_FIN_DIVIDER 0x17 // Read & Write
 
 // THIS IS YOUR FIRST BRANCH
 
@@ -64,14 +71,35 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart2;
+
+// Buffers for channels data
 uint8_t reg_data_MSB_CH0[2];  // Buffer to hold the read data (2 bytes for LDC1614)
 uint8_t reg_data_LSB_CH0[2];  // Buffer to hold the read data (2 bytes for LDC1614)
 uint8_t reg_data_MSB_CH1[2];  // Buffer to hold the read data (2 bytes for LDC1614)
 uint8_t reg_data_LSB_CH1[2];  // Buffer to hold the read data (2 bytes for LDC1614)
+uint8_t reg_data_MSB_CH2[2];  // Buffer to hold the read data (2 bytes for LDC1614)
+uint8_t reg_data_LSB_CH2[2];  // Buffer to hold the read data (2 bytes for LDC1614)
+uint8_t reg_data_MSB_CH3[2];  // Buffer to hold the read data (2 bytes for LDC1614)
+uint8_t reg_data_LSB_CH3[2];  // Buffer to hold the read data (2 bytes for LDC1614)
+
+
+
+// Buffers for channels offsets
 uint8_t reg_CH0_OFFSET[2];
 uint8_t reg_CH1_OFFSET[2];
+uint8_t reg_CH2_OFFSET[2];
+uint8_t reg_CH3_OFFSET[2];
+
+// Buffers for channels frequency dividers
 uint8_t reg_CH0_FIN_DIVIDER[2];
 uint8_t reg_CH1_FIN_DIVIDER[2];
+uint8_t reg_CH2_FIN_DIVIDER[2];
+uint8_t reg_CH3_FIN_DIVIDER[2];
+
+uint8_t config_data_2_Channels[2] = {0x82, 0x0C};  // Configuration to be written for 2 channels mode
+uint8_t config_data_3_Channels[2] = {0xA2, 0x0D};  // Configuration to be written for 3 channels mode
+uint8_t config_data_4_Channels[2] = {0xC2, 0x0C};  // Configuration to be written for 3 channels mode
+uint8_t config_reg = 0x1B;         // Register configuration address
 
 /* USER CODE BEGIN PV */
 
@@ -101,6 +129,10 @@ void LDC1614_ReadRegister(uint8_t reg, uint8_t* buffer, uint16_t size) {
     HAL_I2C_Mem_Read(&hi2c1, LDC1614_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, buffer, size, HAL_MAX_DELAY);
 }
 
+void LDC1614_WriteRegister(uint8_t reg, uint8_t* data, uint16_t size) {
+    HAL_I2C_Mem_Write(&hi2c1, LDC1614_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, data, size, HAL_MAX_DELAY);
+}
+
 // Function to transform hex to dec
 int hex_to_dec(uint16_t hex) {
 	char hexString_CH0[5];
@@ -110,26 +142,35 @@ int hex_to_dec(uint16_t hex) {
 }
 
 // Function to transmit data via UART
-void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t MSB_CH1, uint16_t LSB_CH1, uint16_t CH0_OFFSET, uint16_t CH0_FIN_DIVIDER) {
+void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t CH0_FIN_DIVIDER, uint16_t CH0_OFFSET, uint16_t MSB_CH1, uint16_t LSB_CH1, uint16_t CH1_FIN_DIVIDER, uint16_t CH1_OFFSET, uint16_t MSB_CH2, uint16_t LSB_CH2, uint16_t CH2_FIN_DIVIDER, uint16_t CH2_OFFSET, uint16_t MSB_CH3, uint16_t LSB_CH3, uint16_t CH3_FIN_DIVIDER, uint16_t CH3_OFFSET) {
     static uint32_t transmit_count = 0;  // Counter to keep track of transmitted data instances
     char msg[1000];  // Buffer to hold the transmitted message, size increased to accommodate the count
     transmit_count++;  // Increment the counter each time data is transmitted
 
-    uint16_t LSB_CH0_masked = LSB_CH0 & 0xFFF; // because LSB is only 12 bits
-    uint16_t LSB_CH1_masked = LSB_CH1 & 0xFFF; // because LSB is only 12 bits
-    uint16_t CH0_FIN_DIVIDER_masked = CH0_FIN_DIVIDER & 0xFF; // Only the first byte represents the FIN divider.
+    uint16_t LSB_CH0_masked = LSB_CH0 & 0x0FFF; // because LSB is only 12 bits
+    uint16_t LSB_CH1_masked = LSB_CH1 & 0x0FFF; // because LSB is only 12 bits
+    //uint16_t LSB_CH2_masked = LSB_CH2 & 0xFFF; // because LSB is only 12 bits
+    //uint16_t LSB_CH3_masked = LSB_CH3 & 0xFFF; // because LSB is only 12 bits
+
+
+
+    uint16_t CH0_FIN_DIVIDER_masked = CH0_FIN_DIVIDER & 0x00FF; // Only the first 2 bytes represents the FIN divider.
+    uint16_t CH1_FIN_DIVIDER_masked = CH1_FIN_DIVIDER & 0x00FF; // Only the first 2 bytes represents the FIN divider.
+    uint16_t CH2_FIN_DIVIDER_masked = CH2_FIN_DIVIDER & 0x00FF; // Only the first 2 bytes represents the FIN divider.
+    uint16_t CH3_FIN_DIVIDER_masked = CH3_FIN_DIVIDER & 0x00FF; // Only the first 2 bytes represents the FIN divider.
+
 
 
     // Data transform
-    int integerValue_MSB_CH0 = hex_to_dec(MSB_CH0);
-    int integerValue_LSB_CH0 = hex_to_dec(LSB_CH0_masked);
-    int integerValue_MSB_CH1 = hex_to_dec(MSB_CH1);
-    int integerValue_LSB_CH1 = hex_to_dec(LSB_CH1_masked);
-    int integer_CH0_OFFSET = hex_to_dec(CH0_OFFSET);
-    int integer_CH0_FIN_DIVIDER = hex_to_dec(CH0_FIN_DIVIDER_masked);
+    //int integerValue_MSB_CH0 = hex_to_dec(MSB_CH0);
+    //int integerValue_LSB_CH0 = hex_to_dec(LSB_CH0_masked);
+    //int integerValue_MSB_CH1 = hex_to_dec(MSB_CH1);
+    //int integerValue_LSB_CH1 = hex_to_dec(LSB_CH1_masked);
+    //int integer_CH0_OFFSET = hex_to_dec(CH0_OFFSET);
+    //int integer_CH0_FIN_DIVIDER = hex_to_dec(CH0_FIN_DIVIDER_masked);
 
-    int DATA_CH0 = integerValue_MSB_CH0 * 4096 + integerValue_LSB_CH0;
-    int DATA_CH1 = integerValue_MSB_CH1 * 4096 + integerValue_LSB_CH1;
+    //int DATA_CH0 = integerValue_MSB_CH0 * 4096 + integerValue_LSB_CH0;
+    //int DATA_CH1 = integerValue_MSB_CH1 * 4096 + integerValue_LSB_CH1;
 
     // Calculate sensor frequency
     // uint16_t f_sensor_CH0 = integer_CH0_DIVIDER * 40000000 * ((DATA_CH0 / 268435456) + (integer_CH0_OFFSET / 65536));
@@ -139,7 +180,7 @@ void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t MSB_CH1, uint16_
     //int f_sensor_CH1 = integer_reg_CH1_FIN_DIVIDER * 40000000 * ((DATA_CH1 / 268435456) + (integer_reg_CH1_OFFSET / 65536));
 
     // Format the data as a hexadecimal string along with the counter
-    int len = snprintf(msg, sizeof(msg), "CH0 - MSB: 0x%X, LSB: 0x%X, MSB_int: %d, LSB_int: %d, DATA: %d | CH1 - MSB: 0x%X, LSB: 0x%X, MSB_int: %d, LSB_int: %d, DATA: %d, OffSet: %d, Divider: %d. Cycle: %lu\r\n", MSB_CH0, LSB_CH0, integerValue_MSB_CH0, integerValue_LSB_CH0, DATA_CH0, MSB_CH1, LSB_CH1, integerValue_MSB_CH1, integerValue_LSB_CH1, DATA_CH1, integer_CH0_OFFSET, integer_CH0_FIN_DIVIDER, transmit_count);
+    int len = snprintf(msg, sizeof(msg), "CH0 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH1 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH2 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH3 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d - Cycle: %d \r\n", MSB_CH0, LSB_CH0, CH0_FIN_DIVIDER_masked, CH0_OFFSET, MSB_CH1, LSB_CH1, CH1_FIN_DIVIDER_masked, CH1_OFFSET, MSB_CH2, LSB_CH2, CH2_FIN_DIVIDER_masked, CH2_OFFSET, MSB_CH3, LSB_CH3, CH3_FIN_DIVIDER_masked, CH3_OFFSET, transmit_count);
 
     // Transmit the formatted message
     HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
@@ -210,22 +251,33 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
-
+  LDC1614_WriteRegister(config_reg, config_data_4_Channels, 2);
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
     /* USER CODE END WHILE */
 
-    // Read 2 bytes from register 0x00 of LDC1614
+    // Read data
     LDC1614_ReadRegister(LDC1614_REG_DATA0_MSB, reg_data_MSB_CH0, 2);
     LDC1614_ReadRegister(LDC1614_REG_DATA0_LSB, reg_data_LSB_CH0, 2);
     LDC1614_ReadRegister(LDC1614_REG_DATA1_MSB, reg_data_MSB_CH1, 2);
     LDC1614_ReadRegister(LDC1614_REG_DATA1_LSB, reg_data_LSB_CH1, 2);
+    LDC1614_ReadRegister(LDC1614_REG_DATA2_MSB, reg_data_MSB_CH2, 2);
+    LDC1614_ReadRegister(LDC1614_REG_DATA2_LSB, reg_data_LSB_CH2, 2);
+    LDC1614_ReadRegister(LDC1614_REG_DATA3_MSB, reg_data_MSB_CH3, 2);
+    LDC1614_ReadRegister(LDC1614_REG_DATA3_LSB, reg_data_LSB_CH3, 2);
+
+
     LDC1614_ReadRegister(LDC1614_CH0_OFFSET, reg_CH0_OFFSET, 2);
     LDC1614_ReadRegister(LDC1614_CH1_OFFSET, reg_CH1_OFFSET, 2);
+    LDC1614_ReadRegister(LDC1614_CH2_OFFSET, reg_CH2_OFFSET, 2);
+    LDC1614_ReadRegister(LDC1614_CH3_OFFSET, reg_CH3_OFFSET, 2);
+
     LDC1614_ReadRegister(LDC1614_CH0_FIN_DIVIDER, reg_CH0_FIN_DIVIDER, 2);
     LDC1614_ReadRegister(LDC1614_CH1_FIN_DIVIDER, reg_CH1_FIN_DIVIDER, 2);
+    LDC1614_ReadRegister(LDC1614_CH2_FIN_DIVIDER, reg_CH2_FIN_DIVIDER, 2);
+    LDC1614_ReadRegister(LDC1614_CH3_FIN_DIVIDER, reg_CH3_FIN_DIVIDER, 2);
 
 
     // Combine the two bytes into a single 16-bit value
@@ -233,18 +285,31 @@ int main(void)
     uint16_t LSB_CH0= (reg_data_LSB_CH0[0] << 8) | reg_data_LSB_CH0[1];
     uint16_t MSB_CH1 = (reg_data_MSB_CH1[0] << 8) | reg_data_MSB_CH1[1];
     uint16_t LSB_CH1= (reg_data_LSB_CH1[0] << 8) | reg_data_LSB_CH1[1];
-    uint16_t CH0_OFFSET= (reg_CH0_OFFSET[0] << 8) | reg_CH0_OFFSET[1];
-    uint16_t CH0_FIN_DIVIDER= (reg_CH0_FIN_DIVIDER[0] << 8) | reg_CH0_FIN_DIVIDER[1];
+    uint16_t MSB_CH2 = (reg_data_MSB_CH2[0] << 8) | reg_data_MSB_CH2[1];
+    uint16_t LSB_CH2= (reg_data_LSB_CH2[0] << 8) | reg_data_LSB_CH2[1];
+    uint16_t MSB_CH3 = (reg_data_MSB_CH3[0] << 8) | reg_data_MSB_CH3[1];
+    uint16_t LSB_CH3= (reg_data_LSB_CH3[0] << 8) | reg_data_LSB_CH3[1];
 
-    // Data transform
+    uint16_t CH0_OFFSET= (reg_CH0_OFFSET[0] << 8) | reg_CH0_OFFSET[1];
+    uint16_t CH1_OFFSET= (reg_CH1_OFFSET[0] << 8) | reg_CH1_OFFSET[1];
+    uint16_t CH2_OFFSET= (reg_CH2_OFFSET[0] << 8) | reg_CH2_OFFSET[1];
+    uint16_t CH3_OFFSET= (reg_CH3_OFFSET[0] << 8) | reg_CH3_OFFSET[1];
+
+    uint16_t CH0_FIN_DIVIDER= (reg_CH0_FIN_DIVIDER[0] << 8) | reg_CH0_FIN_DIVIDER[1];
+    uint16_t CH1_FIN_DIVIDER= (reg_CH1_FIN_DIVIDER[0] << 8) | reg_CH1_FIN_DIVIDER[1];
+    uint16_t CH2_FIN_DIVIDER= (reg_CH2_FIN_DIVIDER[0] << 8) | reg_CH2_FIN_DIVIDER[1];
+    uint16_t CH3_FIN_DIVIDER= (reg_CH3_FIN_DIVIDER[0] << 8) | reg_CH3_FIN_DIVIDER[1];
+
+
+    // Data transform for output
     int integerValue_MSB_CH0 = hex_to_dec(MSB_CH0);
     int integerValue_MSB_CH1 = hex_to_dec(MSB_CH1);
 
 
     // Transmit the register value via UART
-    Transmit_Data(MSB_CH0, LSB_CH0, MSB_CH1, LSB_CH1, CH0_OFFSET, CH0_FIN_DIVIDER);
+    Transmit_Data(MSB_CH0, LSB_CH0, CH0_FIN_DIVIDER, CH0_OFFSET, MSB_CH1, LSB_CH1, CH1_FIN_DIVIDER, CH1_OFFSET, MSB_CH2, LSB_CH2, CH2_FIN_DIVIDER, CH2_OFFSET, MSB_CH3, LSB_CH3, CH3_FIN_DIVIDER, CH3_OFFSET);
 
-    if (integerValue_MSB_CH0 > 398 || integerValue_MSB_CH1 > 310 ){
+    if (integerValue_MSB_CH0 > 312 || integerValue_MSB_CH1 > 310 ){
     	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
     }else{
     	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
