@@ -37,7 +37,7 @@
 // Define the I2C address of LDC1614 (7-bit address, shift left for 8-bit format)
 #define LDC1614_ADDRESS (0x2A << 1)  // Adjust based on your sensor's I2C address configuration
 
-// Define Channels registers to read
+// Define Channels data registers
 #define LDC1614_REG_DATA0_MSB 0x00  // Register address for DATA_MSB_CH0 // Read Only
 #define LDC1614_REG_DATA0_LSB 0x01  // Register address for DATA_LSB_CH0 // Read Only
 #define LDC1614_REG_DATA1_MSB 0x02  // Register address for DATA_MSB_CH1 // Read Only
@@ -47,17 +47,17 @@
 #define LDC1614_REG_DATA3_MSB 0x06  // Register address for DATA_MSB_CH3 // Read Only
 #define LDC1614_REG_DATA3_LSB 0x07  // Register address for DATA_LSB_CH3 // Read Only
 
-// Define Channels offsets to read
-#define LDC1614_CH0_OFFSET 0x0C // Read & Write
-#define LDC1614_CH1_OFFSET 0x0D // Read & Write
-#define LDC1614_CH2_OFFSET 0x0E // Read & Write
-#define LDC1614_CH3_OFFSET 0x0F // Read & Write
+// Define Channels offsets registers
+#define LDC1614_CH0_OFFSET 0x0C // Offset channel 0 // Read & Write
+#define LDC1614_CH1_OFFSET 0x0D // Offset channel 1 // Read & Write
+#define LDC1614_CH2_OFFSET 0x0E // Offset channel 2 // Read & Write
+#define LDC1614_CH3_OFFSET 0x0F // Offset channel 3 // Read & Write
 
-
-#define LDC1614_CH0_FIN_DIVIDER 0x14 // Read & Write
-#define LDC1614_CH1_FIN_DIVIDER 0x15 // Read & Write
-#define LDC1614_CH2_FIN_DIVIDER 0x16 // Read & Write
-#define LDC1614_CH3_FIN_DIVIDER 0x17 // Read & Write
+// Define Channels dividers registers
+#define LDC1614_CH0_FIN_DIVIDER 0x14 // Divider channel 0 // Read & Write
+#define LDC1614_CH1_FIN_DIVIDER 0x15 // Divider channel 1 // Read & Write
+#define LDC1614_CH2_FIN_DIVIDER 0x16 // Divider channel 2 // Read & Write
+#define LDC1614_CH3_FIN_DIVIDER 0x17 // Divider channel 3 // Read & Write
 
 // THIS IS YOUR FIRST BRANCH
 
@@ -96,9 +96,10 @@ uint8_t reg_CH1_FIN_DIVIDER[2];
 uint8_t reg_CH2_FIN_DIVIDER[2];
 uint8_t reg_CH3_FIN_DIVIDER[2];
 
+// Read Configurations (2, 3 or 4 channels)
 uint8_t config_data_2_Channels[2] = {0x82, 0x0C};  // Configuration to be written for 2 channels mode
 uint8_t config_data_3_Channels[2] = {0xA2, 0x0D};  // Configuration to be written for 3 channels mode
-uint8_t config_data_4_Channels[2] = {0xC2, 0x0C};  // Configuration to be written for 3 channels mode
+uint8_t config_data_4_Channels[2] = {0xC2, 0x0C};  // Configuration to be written for 4 channels mode
 uint8_t config_reg = 0x1B;         // Register configuration address
 
 /* USER CODE BEGIN PV */
@@ -144,9 +145,24 @@ int hex_to_dec(uint16_t hex) {
 
 // Reset the device
 void LDC1614_reset() {
-    uint8_t reg_reset = 0x1C;              // Register address to reset the LDC1614
-    uint8_t buffer_reset=0x8000;           // The reset command
-    LDC1614_WriteRegister(reg_reset, buffer_reset, 2);
+    uint8_t reg_reset = 0x1C;            // Register address for the reset command
+    uint16_t reset_command = 0x8000;     // The reset command (16-bit)
+
+    // Write the reset command to the register
+    LDC1614_WriteRegister(reg_reset, (uint8_t*)&reset_command, sizeof(reset_command));
+}
+
+void LDC1614_WriteRegister_LSB(uint16_t reg, uint16_t* data, uint16_t size) {
+    uint8_t current_data[2];  // Array to hold the current register value (MSB + LSB)
+
+    // Read the current value of the register (assuming the register is 16 bits)
+    HAL_I2C_Mem_Read(&hi2c1, LDC1614_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, current_data, 2, HAL_MAX_DELAY);
+
+    // Update the LSB (first 8 bits) while keeping the MSB (second 8 bits) unchanged
+    current_data[1] = data;  // Write new LSB from the input data
+
+    // Write the updated register value (MSB unchanged, LSB updated)
+    HAL_I2C_Mem_Write(&hi2c1, LDC1614_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, current_data, 2, HAL_MAX_DELAY);
 }
 
 // Function to transmit data via UART
@@ -257,9 +273,20 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+
+  // Reseting the LDC
   LDC1614_reset();
   HAL_Delay(100);
-  LDC1614_WriteRegister(config_reg, config_data_4_Channels, 2);
+
+  //Number of channels configuration for the LDC1614
+  LDC1614_WriteRegister(config_reg, config_data_3_Channels, 2);
+
+  //Frequency divider configuration for the LDC1614
+  LDC1614_WriteRegister_LSB(LDC1614_CH0_FIN_DIVIDER, 0x0C, 1); // Setting the freq divider as 40
+  LDC1614_WriteRegister_LSB(LDC1614_CH1_FIN_DIVIDER, 0x0C, 1);
+  //LDC1614_WriteRegister_LSB(LDC1614_CH2_FIN_DIVIDER, 0x28, 1);
+  //LDC1614_WriteRegister_LSB(LDC1614_CH3_FIN_DIVIDER, 0x28, 1);
+
   /* USER CODE END 2 */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
