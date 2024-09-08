@@ -18,12 +18,16 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <stdlib.h>  // For strtol
 #include <stdint.h>  // For uint32_t
+#include <string.h>
+#include <math.h>
+#include <ctype.h>
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+
 
 /* USER CODE END Includes */
 
@@ -59,6 +63,9 @@
 #define LDC1614_CH2_FIN_DIVIDER 0x16 // Divider channel 2 // Read & Write
 #define LDC1614_CH3_FIN_DIVIDER 0x17 // Divider channel 3 // Read & Write
 
+// Define MUX configuration register
+#define MUX_reg 0x1B
+
 // THIS IS YOUR FIRST BRANCH
 
 /* USER CODE END PD */
@@ -82,8 +89,6 @@ uint8_t reg_data_LSB_CH2[2];  // Buffer to hold the read data (2 bytes for LDC16
 uint8_t reg_data_MSB_CH3[2];  // Buffer to hold the read data (2 bytes for LDC1614)
 uint8_t reg_data_LSB_CH3[2];  // Buffer to hold the read data (2 bytes for LDC1614)
 
-
-
 // Buffers for channels offsets
 uint8_t reg_CH0_OFFSET[2];
 uint8_t reg_CH1_OFFSET[2];
@@ -96,11 +101,25 @@ uint8_t reg_CH1_FIN_DIVIDER[2];
 uint8_t reg_CH2_FIN_DIVIDER[2];
 uint8_t reg_CH3_FIN_DIVIDER[2];
 
-// Read Configurations (2, 3 or 4 channels)
-uint8_t config_data_2_Channels[2] = {0x82, 0x0C};  // Configuration to be written for 2 channels mode
-uint8_t config_data_3_Channels[2] = {0xA2, 0x0D};  // Configuration to be written for 3 channels mode
-uint8_t config_data_4_Channels[2] = {0xC2, 0x0C};  // Configuration to be written for 4 channels mode
-uint8_t config_reg = 0x1B;         // Register configuration address
+//MUX Configurations (2, 3 or 4 channels)
+uint8_t config_channels_DeGlitch[2] = {0x82, 0x0C};  // Configuration to be written, change here.
+
+// Configurations (2, 3 or 4 channels)
+uint8_t config_2Channels_1MHz[2] = {0x82, 0x09};  // Configuration to be written for 2 channels mode // Deglitsh 1MHz
+uint8_t config_3Channels_1MHz[2] = {0xA2, 0x09};  // Configuration to be written for 3 channels mode // Deglitsh 1MHz
+uint8_t config_4Channels_1MHz[2] = {0xC2, 0x09};  // Configuration to be written for 4 channels mode // Deglitsh 1MHz
+
+uint8_t config_2Channels_3MHz[2] = {0x82, 0x0C};  // Configuration to be written for 2 channels mode // Deglitsh 3.3MHz
+uint8_t config_3Channels_3MHz[2] = {0xA2, 0x0C};  // Configuration to be written for 3 channels mode // Deglitsh 3.3MHz
+uint8_t config_4Channels_3MHz[2] = {0xC2, 0x0C};  // Configuration to be written for 4 channels mode // Deglitsh 3.3MHz
+
+uint8_t config_2Channels_10MHz[2] = {0x82, 0x0D};  // Configuration to be written for 2 channels mode // Deglitsh 10MHz
+uint8_t config_3Channels_10MHz[2] = {0xA2, 0x0D};  // Configuration to be written for 3 channels mode // Deglitsh 10MHz
+uint8_t config_4Channels_10MHz[2] = {0xC2, 0x0D};  // Configuration to be written for 4 channels mode // Deglitsh 10MHz
+
+uint8_t config_2Channels_33MHz[2] = {0x82, 0x0F};  // Configuration to be written for 2 channels mode // Deglitsh 33MHz
+uint8_t config_3Channels_33MHz[2] = {0xA2, 0x0F};  // Configuration to be written for 3 channels mode // Deglitsh 33MHz
+uint8_t config_4Channels_33MHz[2] = {0xC2, 0x0F};  // Configuration to be written for 4 channels mode // Deglitsh 33MHz
 
 /* USER CODE BEGIN PV */
 
@@ -183,26 +202,6 @@ void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t CH0_FIN_DIVIDER,
     uint16_t CH2_FIN_DIVIDER_masked = CH2_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
     uint16_t CH3_FIN_DIVIDER_masked = CH3_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
 
-
-
-    // Data transform
-    //int integerValue_MSB_CH0 = hex_to_dec(MSB_CH0);
-    //int integerValue_LSB_CH0 = hex_to_dec(LSB_CH0_masked);
-    //int integerValue_MSB_CH1 = hex_to_dec(MSB_CH1);
-    //int integerValue_LSB_CH1 = hex_to_dec(LSB_CH1_masked);
-    //int integer_CH0_OFFSET = hex_to_dec(CH0_OFFSET);
-    //int integer_CH0_FIN_DIVIDER = hex_to_dec(CH0_FIN_DIVIDER_masked);
-
-    //int DATA_CH0 = integerValue_MSB_CH0 * 4096 + integerValue_LSB_CH0;
-    //int DATA_CH1 = integerValue_MSB_CH1 * 4096 + integerValue_LSB_CH1;
-
-    // Calculate sensor frequency
-    // uint16_t f_sensor_CH0 = integer_CH0_DIVIDER * 40000000 * ((DATA_CH0 / 268435456) + (integer_CH0_OFFSET / 65536));
-    //uint16_t f_sensor_CH0 = 40000000 * (DATA_CH0 / (1 << 28));
-
-
-    //int f_sensor_CH1 = integer_reg_CH1_FIN_DIVIDER * 40000000 * ((DATA_CH1 / 268435456) + (integer_reg_CH1_OFFSET / 65536));
-
     // Format the data as a hexadecimal string along with the counter
     int len = snprintf(msg, sizeof(msg), "CH0 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH1 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH2 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH3 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d - Cycle: %ld \r\n", MSB_CH0_masked, LSB_CH0, CH0_FIN_DIVIDER_masked, CH0_OFFSET, MSB_CH1_masked, LSB_CH1, CH1_FIN_DIVIDER_masked, CH1_OFFSET, MSB_CH2_masked, LSB_CH2, CH2_FIN_DIVIDER_masked, CH2_OFFSET, MSB_CH3_masked, LSB_CH3, CH3_FIN_DIVIDER_masked, CH3_OFFSET, transmit_count);
 
@@ -210,42 +209,6 @@ void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t CH0_FIN_DIVIDER,
     HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
 }
 
-//// Function to combine 16-bit MSB and 12-bit LSB into a 28-bit value
-//uint32_t combine_msb_lsb(uint16_t msb, uint16_t lsb) {
-//    // Mask the LSB to ensure it is only 12 bits
-//    uint16_t lsb_12bit = lsb & 0x0FFF;
-//    // Shift the MSB 12 bits to the left and combine with the LSB
-//    uint32_t combined_value = ((uint32_t)msb << 12) | lsb_12bit;
-//    return combined_value;
-//}
-//// Function to combine 16-bit MSB and 12-bit LSB into a 28-bit decimal value
-//uint32_t combine_msb_lsb_to_decimal(uint16_t msb, uint16_t lsb) {
-//    // Mask the LSB to ensure only the lower 12 bits are used
-//    uint16_t lsb_12bit = lsb & 0x0FFF;
-//    // Combine MSB and LSB to form a 28-bit value
-//    uint32_t combined_value = ((uint32_t)msb << 12) | lsb_12bit;
-//    return combined_value;
-//}
-//uint32_t combine_msb_lsb_to_integer(uint16_t msb, uint16_t lsb) {
-//    // Mask the LSB to ensure only the lower 12 bits are used
-//    uint16_t lsb_12bit = lsb & 0x0FFF;
-//    // Combine MSB and LSB to form a 28-bit value
-//    uint32_t combined_value = ((uint32_t)msb << 12) | lsb_12bit;
-//    return combined_value;
-//}
-//// Function to convert the combined 28-bit value to a float
-//float combine_msb_lsb_to_float(uint16_t msb, uint16_t lsb) {
-//    uint32_t integer_value = combine_msb_lsb_to_integer(msb, lsb);
-//    return (float)integer_value;
-//}
-//int calculate_bits(uint32_t value) {
-//    int bits = 0;
-//    while (value > 0) {
-//        bits++;
-//        value >>= 1; // Right shift by 1 bit
-//    }
-//    return bits;
-//}
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -278,14 +241,14 @@ int main(void)
   LDC1614_reset();
   HAL_Delay(100);
 
-  //Number of channels configuration for the LDC1614
-  LDC1614_WriteRegister(config_reg, config_data_3_Channels, 2);
-
   //Frequency divider configuration for the LDC1614
-  LDC1614_WriteRegister_LSB(LDC1614_CH0_FIN_DIVIDER, 0x0C, 1); // Setting the freq divider as 40
-  LDC1614_WriteRegister_LSB(LDC1614_CH1_FIN_DIVIDER, 0x0C, 1);
+  LDC1614_WriteRegister_LSB(LDC1614_CH0_FIN_DIVIDER, 0x0C, 1); // Setting the frequency divider as 12 // Equal to resonance frequency + 10%
+  LDC1614_WriteRegister_LSB(LDC1614_CH1_FIN_DIVIDER, 0x0C, 1); // Setting the frequency divider as 12 // Equal to resonance frequency + 10%
   //LDC1614_WriteRegister_LSB(LDC1614_CH2_FIN_DIVIDER, 0x28, 1);
   //LDC1614_WriteRegister_LSB(LDC1614_CH3_FIN_DIVIDER, 0x28, 1);
+
+  //Number of channels configuration for the LDC1614 & Deglitch
+  LDC1614_WriteRegister(MUX_reg, config_4Channels_10MHz, 2);
 
   /* USER CODE END 2 */
   /* Infinite loop */
@@ -314,7 +277,6 @@ int main(void)
     LDC1614_ReadRegister(LDC1614_CH1_FIN_DIVIDER, reg_CH1_FIN_DIVIDER, 2);
     LDC1614_ReadRegister(LDC1614_CH2_FIN_DIVIDER, reg_CH2_FIN_DIVIDER, 2);
     LDC1614_ReadRegister(LDC1614_CH3_FIN_DIVIDER, reg_CH3_FIN_DIVIDER, 2);
-
 
     // Combine the two bytes into a single 16-bit value
     uint16_t MSB_CH0 = (reg_data_MSB_CH0[0] << 8) | reg_data_MSB_CH0[1];
@@ -345,7 +307,7 @@ int main(void)
     // Transmit the register value via UART
     Transmit_Data(MSB_CH0, LSB_CH0, CH0_FIN_DIVIDER, CH0_OFFSET, MSB_CH1, LSB_CH1, CH1_FIN_DIVIDER, CH1_OFFSET, MSB_CH2, LSB_CH2, CH2_FIN_DIVIDER, CH2_OFFSET, MSB_CH3, LSB_CH3, CH3_FIN_DIVIDER, CH3_OFFSET);
 
-    if (integerValue_MSB_CH0 > 312 || integerValue_MSB_CH1 > 310 ){
+    if (integerValue_MSB_CH0 > 3700 || integerValue_MSB_CH1 > 3700 ){
     	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
     }else{
     	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
