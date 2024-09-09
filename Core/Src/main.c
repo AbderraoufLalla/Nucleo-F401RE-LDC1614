@@ -63,8 +63,29 @@
 #define LDC1614_CH2_FIN_DIVIDER 0x16 // Divider channel 2 // Read & Write
 #define LDC1614_CH3_FIN_DIVIDER 0x17 // Divider channel 3 // Read & Write
 
+// Define RCOUNT registers
+#define RCOUNT_CH0 0x08
+#define RCOUNT_CH1 0x09
+#define RCOUNT_CH2 0x0A
+#define RCOUNT_CH3 0x0B
+
+// Define SETTLECOUNT registers
+#define SETTLECOUNT_CH0 0x10
+#define SETTLECOUNT_CH1 0x11
+#define SETTLECOUNT_CH2 0x12
+#define SETTLECOUNT_CH3 0x13
+
+
 // Define MUX configuration register
+#define CONFIG_reg 0x1A
 #define MUX_reg 0x1B
+#define RESET_DEV 0x1C
+
+
+#define DRIVE_CURRENT_CH0 0x1E
+#define DRIVE_CURRENT_CH1 0x1F
+#define DRIVE_CURRENT_CH2 0x20
+#define DRIVE_CURRENT_CH3 0x21
 
 // THIS IS YOUR FIRST BRANCH
 
@@ -121,6 +142,20 @@ uint8_t config_2Channels_33MHz[2] = {0x82, 0x0F};  // Configuration to be writte
 uint8_t config_3Channels_33MHz[2] = {0xA2, 0x0F};  // Configuration to be written for 3 channels mode // Deglitsh 33MHz
 uint8_t config_4Channels_33MHz[2] = {0xC2, 0x0F};  // Configuration to be written for 4 channels mode // Deglitsh 33MHz
 
+// COUNTS SETTINGS
+uint8_t R_COUNT_DEFAULT[2] = {0xFF, 0xFF};
+uint8_t SETTLECOUNT_DEFAULT[2] = {0x04, 0x00};
+
+// CLOCK SETTINGS
+uint8_t clk_src[2] = {0x1c, 0x01};
+uint8_t reset_value[2] = {0x80, 0x00};
+uint8_t active_value[2] = {0x00, 0x00};
+
+uint8_t DIVIDER_DEFAULT[2] = {0x10, 0x0E};
+
+uint8_t DRIVE_CURRENT_DEFAULT[2] = {0x8C, 0x40};
+
+
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -162,15 +197,6 @@ int hex_to_dec(uint16_t hex) {
 	return integerValue;
 }
 
-// Reset the device
-void LDC1614_reset() {
-    uint8_t reg_reset = 0x1C;            // Register address for the reset command
-    uint16_t reset_command = 0x8000;     // The reset command (16-bit)
-
-    // Write the reset command to the register
-    LDC1614_WriteRegister(reg_reset, (uint8_t*)&reset_command, sizeof(reset_command));
-}
-
 void LDC1614_WriteRegister_LSB(uint16_t reg, uint16_t* data, uint16_t size) {
     uint8_t current_data[2];  // Array to hold the current register value (MSB + LSB)
 
@@ -203,7 +229,7 @@ void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t CH0_FIN_DIVIDER,
     uint16_t CH3_FIN_DIVIDER_masked = CH3_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
 
     // Format the data as a hexadecimal string along with the counter
-    int len = snprintf(msg, sizeof(msg), "CH0 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH1 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH2 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH3 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d - Cycle: %ld \r\n", MSB_CH0_masked, LSB_CH0, CH0_FIN_DIVIDER_masked, CH0_OFFSET, MSB_CH1_masked, LSB_CH1, CH1_FIN_DIVIDER_masked, CH1_OFFSET, MSB_CH2_masked, LSB_CH2, CH2_FIN_DIVIDER_masked, CH2_OFFSET, MSB_CH3_masked, LSB_CH3, CH3_FIN_DIVIDER_masked, CH3_OFFSET, transmit_count);
+    int len = snprintf(msg, sizeof(msg), "CH0 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH1 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH2 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH3 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d - Cycle: %d \r\n", MSB_CH0_masked, LSB_CH0, CH0_FIN_DIVIDER_masked, CH0_OFFSET, MSB_CH1_masked, LSB_CH1, CH1_FIN_DIVIDER_masked, CH1_OFFSET, MSB_CH2_masked, LSB_CH2, CH2_FIN_DIVIDER_masked, CH2_OFFSET, MSB_CH3_masked, LSB_CH3, CH3_FIN_DIVIDER_masked, CH3_OFFSET, transmit_count);
 
     // Transmit the formatted message
     HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
@@ -235,20 +261,41 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
-  /* USER CODE BEGIN 2 */
 
-  // Reseting the LDC
-  LDC1614_reset();
-  HAL_Delay(100);
+  /* USER CODE BEGIN 2 */
+  LDC1614_WriteRegister(RESET_DEV, reset_value, 2);
+  LDC1614_WriteRegister(RESET_DEV, active_value, 2);
+
+
+  // Initialising RCOUNT
+  LDC1614_WriteRegister(RCOUNT_CH0, R_COUNT_DEFAULT, 2);
+  LDC1614_WriteRegister(RCOUNT_CH1, R_COUNT_DEFAULT, 2);
+  LDC1614_WriteRegister(RCOUNT_CH2, R_COUNT_DEFAULT, 2);
+  LDC1614_WriteRegister(RCOUNT_CH3, R_COUNT_DEFAULT, 2);
+
+  // Initialising SETTLECOUNT
+  LDC1614_WriteRegister(SETTLECOUNT_CH0, SETTLECOUNT_DEFAULT, 2);
+  LDC1614_WriteRegister(SETTLECOUNT_CH1, SETTLECOUNT_DEFAULT, 2);
+  LDC1614_WriteRegister(SETTLECOUNT_CH2, SETTLECOUNT_DEFAULT, 2);
+  LDC1614_WriteRegister(SETTLECOUNT_CH3, SETTLECOUNT_DEFAULT, 2);
 
   //Frequency divider configuration for the LDC1614
-  LDC1614_WriteRegister_LSB(LDC1614_CH0_FIN_DIVIDER, 0x0C, 1); // Setting the frequency divider as 12 // Equal to resonance frequency + 10%
-  LDC1614_WriteRegister_LSB(LDC1614_CH1_FIN_DIVIDER, 0x0C, 1); // Setting the frequency divider as 12 // Equal to resonance frequency + 10%
-  //LDC1614_WriteRegister_LSB(LDC1614_CH2_FIN_DIVIDER, 0x28, 1);
-  //LDC1614_WriteRegister_LSB(LDC1614_CH3_FIN_DIVIDER, 0x28, 1);
+  LDC1614_WriteRegister(LDC1614_CH0_FIN_DIVIDER, DIVIDER_DEFAULT, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
+  LDC1614_WriteRegister(LDC1614_CH1_FIN_DIVIDER, DIVIDER_DEFAULT, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
+  LDC1614_WriteRegister(LDC1614_CH2_FIN_DIVIDER, DIVIDER_DEFAULT, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
+  LDC1614_WriteRegister(LDC1614_CH3_FIN_DIVIDER, DIVIDER_DEFAULT, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
+
+  //Clock configuration: Internal clock
+  LDC1614_WriteRegister(CONFIG_reg, clk_src, 2);
 
   //Number of channels configuration for the LDC1614 & Deglitch
-  LDC1614_WriteRegister(MUX_reg, config_4Channels_10MHz, 2);
+  LDC1614_WriteRegister(MUX_reg, config_2Channels_3MHz, 2);
+
+  LDC1614_WriteRegister(DRIVE_CURRENT_CH0, DRIVE_CURRENT_DEFAULT, 2);
+  LDC1614_WriteRegister(DRIVE_CURRENT_CH1, DRIVE_CURRENT_DEFAULT, 2);
+  LDC1614_WriteRegister(DRIVE_CURRENT_CH2, DRIVE_CURRENT_DEFAULT, 2);
+  LDC1614_WriteRegister(DRIVE_CURRENT_CH3, DRIVE_CURRENT_DEFAULT, 2);
+
 
   /* USER CODE END 2 */
   /* Infinite loop */
@@ -299,7 +346,7 @@ int main(void)
     uint16_t CH3_FIN_DIVIDER= (reg_CH3_FIN_DIVIDER[0] << 8) | reg_CH3_FIN_DIVIDER[1];
 
 
-    // Data transform for output
+    // Data transform for output LED
     int integerValue_MSB_CH0 = hex_to_dec(MSB_CH0);
     int integerValue_MSB_CH1 = hex_to_dec(MSB_CH1);
 
