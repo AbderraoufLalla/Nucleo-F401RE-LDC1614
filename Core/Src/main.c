@@ -151,7 +151,11 @@ uint8_t clk_src[2] = {0x1c, 0x01};
 uint8_t reset_value[2] = {0x80, 0x00};
 uint8_t active_value[2] = {0x00, 0x00};
 
-uint8_t DIVIDER_DEFAULT[2] = {0x10, 0x0E};
+// DIVIDER AND CLOCK SOURCE
+uint8_t DIVIDER_DEFAULT_CH0[2] = {0x10, 0x0E};
+uint8_t DIVIDER_DEFAULT_CH1[2] = {0x10, 0x0C};
+uint8_t DIVIDER_DEFAULT_CH2[2] = {0x10, 0x12};
+uint8_t DIVIDER_DEFAULT_CH3[2] = {0x10, 0x0C};
 
 uint8_t DRIVE_CURRENT_DEFAULT[2] = {0x8C, 0x40};
 
@@ -210,30 +214,120 @@ void LDC1614_WriteRegister_LSB(uint16_t reg, uint16_t* data, uint16_t size) {
     HAL_I2C_Mem_Write(&hi2c1, LDC1614_ADDRESS, reg, I2C_MEMADD_SIZE_8BIT, current_data, 2, HAL_MAX_DELAY);
 }
 
-// Function to transmit data via UART
-void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t CH0_FIN_DIVIDER, uint16_t CH0_OFFSET, uint16_t MSB_CH1, uint16_t LSB_CH1, uint16_t CH1_FIN_DIVIDER, uint16_t CH1_OFFSET, uint16_t MSB_CH2, uint16_t LSB_CH2, uint16_t CH2_FIN_DIVIDER, uint16_t CH2_OFFSET, uint16_t MSB_CH3, uint16_t LSB_CH3, uint16_t CH3_FIN_DIVIDER, uint16_t CH3_OFFSET) {
+uint32_t calculate_raw_code(uint16_t msb, uint16_t lsb) {
+    // Ensure MSB is 12-bit and LSB is 16-bit
+    if (msb >= (1 << 12)) {
+        return 0;
+    }
+    if (lsb >= (1 << 16)) {
+        return 0;
+    }
+    uint32_t raw_code = msb * 65536 + lsb;
+    return raw_code;
+}
+
+int calculate_frequency_supply(float f_ref, float div) {
+    float f_supply = f_ref / div * 1000;  // Ensure the division is treated as floating-point
+    return f_supply;
+}
+
+float calculate_frequency_sensor(float f_ref, float div, float raw_code) {
+    float f_supply = f_ref / div;  // Ensure the division is treated as floating-point
+    float delta_CH0 =  raw_code / 268435.456;
+
+    float f_sensor = f_supply * delta_CH0;
+    return f_sensor;
+}
+
+// Function to calculate inductance in microhenries
+float calculate_inductance(float raw_code, int f_supply, float fin_divider) {
+    float delta = raw_code / 268435.456f;
+    float f_sensor = f_supply * delta / 1000.0f;
+
+    float a = 2 * 3.14f * f_sensor * 1000.0f;
+    float b = a * a;  // Square 'a'
+    float c = b * 330.0f * 1e-12f;  // Representation of 10^-12
+
+    return (c != 0) ? (1 / c) * 1e9f : 0;  // Convert to microhenries
+}
+
+void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t CH0_FIN_DIVIDER, uint16_t CH0_OFFSET,
+                    uint16_t MSB_CH1, uint16_t LSB_CH1, uint16_t CH1_FIN_DIVIDER, uint16_t CH1_OFFSET,
+                    uint16_t MSB_CH2, uint16_t LSB_CH2, uint16_t CH2_FIN_DIVIDER, uint16_t CH2_OFFSET,
+                    uint16_t MSB_CH3, uint16_t LSB_CH3, uint16_t CH3_FIN_DIVIDER, uint16_t CH3_OFFSET) {
     static uint32_t transmit_count = 0;  // Counter to keep track of transmitted data instances
-    char msg[1000];  // Buffer to hold the transmitted message, size increased to accommodate the count
+    char msg[1000];  // Buffer to hold the transmitted message
+
     transmit_count++;  // Increment the counter each time data is transmitted
 
-    uint16_t MSB_CH0_masked = MSB_CH0 & 0x0FFF; // because LSB is only 12 bits
-    uint16_t MSB_CH1_masked = MSB_CH1 & 0x0FFF; // because LSB is only 12 bits
-    uint16_t MSB_CH2_masked = MSB_CH2 & 0xFFF; // because LSB is only 12 bits
-    uint16_t MSB_CH3_masked = MSB_CH3 & 0xFFF; // because LSB is only 12 bits
+    // Sensor calculation using 43.4 MHz // PS: the f_supply is in KHz
+    float reference_frequency = 43.4;
+
+    // Mask MSB values to 12 bits
+    uint16_t MSB_CH0_masked = MSB_CH0 & 0x0FFF;
+    uint16_t MSB_CH1_masked = MSB_CH1 & 0x0FFF;
+    uint16_t MSB_CH2_masked = MSB_CH2 & 0x0FFF;
+    uint16_t MSB_CH3_masked = MSB_CH3 & 0x0FFF;
+
+    // Mask FIN divider to 8 bits
+    uint16_t CH0_FIN_DIVIDER_masked = CH0_FIN_DIVIDER & 0x00FF;
+    uint16_t CH1_FIN_DIVIDER_masked = CH1_FIN_DIVIDER & 0x00FF;
+    uint16_t CH2_FIN_DIVIDER_masked = CH2_FIN_DIVIDER & 0x00FF;
+    uint16_t CH3_FIN_DIVIDER_masked = CH3_FIN_DIVIDER & 0x00FF;
+
+    uint32_t raw_code_CH0 = calculate_raw_code(MSB_CH0_masked, LSB_CH0);
+    uint32_t raw_code_CH1 = calculate_raw_code(MSB_CH1_masked, LSB_CH1);
+    uint32_t raw_code_CH2 = calculate_raw_code(MSB_CH2_masked, LSB_CH2);
+    uint32_t raw_code_CH3 = calculate_raw_code(MSB_CH3_masked, LSB_CH3);
+
+    int f_supply_CH0 = calculate_frequency_supply(reference_frequency, CH0_FIN_DIVIDER_masked);
+    int f_supply_CH1 = calculate_frequency_supply(reference_frequency, CH1_FIN_DIVIDER_masked);
+    int f_supply_CH2 = calculate_frequency_supply(reference_frequency, CH2_FIN_DIVIDER_masked);
+    int f_supply_CH3 = calculate_frequency_supply(reference_frequency, CH3_FIN_DIVIDER_masked);
+
+    int f_sensor_CH0 = calculate_frequency_sensor(reference_frequency, CH0_FIN_DIVIDER_masked, raw_code_CH0);
+    int f_sensor_CH1 = calculate_frequency_sensor(reference_frequency, CH1_FIN_DIVIDER_masked, raw_code_CH1);
+    int f_sensor_CH2 = calculate_frequency_sensor(reference_frequency, CH2_FIN_DIVIDER_masked, raw_code_CH2);
+    int f_sensor_CH3 = calculate_frequency_sensor(reference_frequency, CH3_FIN_DIVIDER_masked, raw_code_CH3);
+
+//
+//    float a = 2 * 3.14f * f_sensor_CH0 * 1000;
+//    float b = pow(a, 2);  // Correct way to square 'a'
+//    float c = b * 330 * 1e-12;  // Correct representation of 10^-12
+//    int L_CH0 = 1000000000 / c;  // Assuming 'c' is not zero
+
+    int L_CH0 = calculate_inductance(raw_code_CH0, f_supply_CH0, CH0_FIN_DIVIDER_masked);
+    int L_CH1 = calculate_inductance(raw_code_CH1, f_supply_CH1, CH1_FIN_DIVIDER_masked);
+    int L_CH2 = calculate_inductance(raw_code_CH2, f_supply_CH2, CH2_FIN_DIVIDER_masked);
+    int L_CH3 = calculate_inductance(raw_code_CH3, f_supply_CH3, CH3_FIN_DIVIDER_masked);
 
 
+   // Format the data as a hexadecimal string along with the counter
+    int len = snprintf(msg, sizeof(msg),
+                       "CH0 - MSB:%d LSB:%d F_DIV:%d f_supply:%i| "
+                       "CH1 - MSB:%d LSB:%d F_DIV:%d f_supply:%i| "
+                       "CH2 - MSB:%d LSB:%d F_DIV:%d f_supply:%i| "
+                       "CH3 - MSB:%d LSB:%d F_DIV:%d f_supply:%i| "
+                       "f_sensor_CH2:%li L_CH2:%li - %i\n\r",
+                       MSB_CH0_masked, LSB_CH0, CH0_FIN_DIVIDER_masked, f_supply_CH0,
+                       MSB_CH1_masked, LSB_CH1, CH1_FIN_DIVIDER_masked, f_supply_CH1,
+                       MSB_CH2_masked, LSB_CH2, CH2_FIN_DIVIDER_masked, f_supply_CH2,
+                       MSB_CH3_masked, LSB_CH3, CH3_FIN_DIVIDER_masked, f_supply_CH3,
+                       f_sensor_CH2, L_CH2, transmit_count);
 
-    uint16_t CH0_FIN_DIVIDER_masked = CH0_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
-    uint16_t CH1_FIN_DIVIDER_masked = CH1_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
-    uint16_t CH2_FIN_DIVIDER_masked = CH2_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
-    uint16_t CH3_FIN_DIVIDER_masked = CH3_FIN_DIVIDER & 0x00FF; // Only the first 8 bits represents the FIN divider.
+   if (len < 0 || len >= sizeof(msg)) {
+        // Handle snprintf error or buffer overflow
+        // Consider logging an error message or taking corrective action
+        return;
+    }
 
-    // Format the data as a hexadecimal string along with the counter
-    int len = snprintf(msg, sizeof(msg), "CH0 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH1 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH2 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d | CH3 - MSB: %d, LSB: %d, F_DIV: %d, OFFSET: %d - Cycle: %d \r\n", MSB_CH0_masked, LSB_CH0, CH0_FIN_DIVIDER_masked, CH0_OFFSET, MSB_CH1_masked, LSB_CH1, CH1_FIN_DIVIDER_masked, CH1_OFFSET, MSB_CH2_masked, LSB_CH2, CH2_FIN_DIVIDER_masked, CH2_OFFSET, MSB_CH3_masked, LSB_CH3, CH3_FIN_DIVIDER_masked, CH3_OFFSET, transmit_count);
-
-    // Transmit the formatted message
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY);
+    // Transmit the message over UART
+    if (HAL_UART_Transmit(&huart2, (uint8_t*)msg, len, HAL_MAX_DELAY) != HAL_OK) {
+        // Handle UART transmission error
+        // Consider logging an error message or taking corrective action
+    }
 }
+
 
 int main(void)
 {
@@ -280,21 +374,22 @@ int main(void)
   LDC1614_WriteRegister(SETTLECOUNT_CH3, SETTLECOUNT_DEFAULT, 2);
 
   //Frequency divider configuration for the LDC1614
-  LDC1614_WriteRegister(LDC1614_CH0_FIN_DIVIDER, DIVIDER_DEFAULT, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
-  LDC1614_WriteRegister(LDC1614_CH1_FIN_DIVIDER, DIVIDER_DEFAULT, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
-  LDC1614_WriteRegister(LDC1614_CH2_FIN_DIVIDER, DIVIDER_DEFAULT, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
-  LDC1614_WriteRegister(LDC1614_CH3_FIN_DIVIDER, DIVIDER_DEFAULT, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
+  LDC1614_WriteRegister(LDC1614_CH0_FIN_DIVIDER, DIVIDER_DEFAULT_CH0, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
+  LDC1614_WriteRegister(LDC1614_CH1_FIN_DIVIDER, DIVIDER_DEFAULT_CH1, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
+  LDC1614_WriteRegister(LDC1614_CH2_FIN_DIVIDER, DIVIDER_DEFAULT_CH2, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
+  LDC1614_WriteRegister(LDC1614_CH3_FIN_DIVIDER, DIVIDER_DEFAULT_CH3, 2); // Setting the frequency divider as 12 // F_IN = 1 // Equal to resonance frequency + 10%
 
   //Clock configuration: Internal clock
   LDC1614_WriteRegister(CONFIG_reg, clk_src, 2);
 
   //Number of channels configuration for the LDC1614 & Deglitch
-  LDC1614_WriteRegister(MUX_reg, config_2Channels_3MHz, 2);
+  LDC1614_WriteRegister(MUX_reg, config_3Channels_3MHz, 2);
 
   LDC1614_WriteRegister(DRIVE_CURRENT_CH0, DRIVE_CURRENT_DEFAULT, 2);
   LDC1614_WriteRegister(DRIVE_CURRENT_CH1, DRIVE_CURRENT_DEFAULT, 2);
   LDC1614_WriteRegister(DRIVE_CURRENT_CH2, DRIVE_CURRENT_DEFAULT, 2);
   LDC1614_WriteRegister(DRIVE_CURRENT_CH3, DRIVE_CURRENT_DEFAULT, 2);
+
 
 
   /* USER CODE END 2 */
@@ -350,7 +445,6 @@ int main(void)
     int integerValue_MSB_CH0 = hex_to_dec(MSB_CH0);
     int integerValue_MSB_CH1 = hex_to_dec(MSB_CH1);
 
-
     // Transmit the register value via UART
     Transmit_Data(MSB_CH0, LSB_CH0, CH0_FIN_DIVIDER, CH0_OFFSET, MSB_CH1, LSB_CH1, CH1_FIN_DIVIDER, CH1_OFFSET, MSB_CH2, LSB_CH2, CH2_FIN_DIVIDER, CH2_OFFSET, MSB_CH3, LSB_CH3, CH3_FIN_DIVIDER, CH3_OFFSET);
 
@@ -360,6 +454,8 @@ int main(void)
     	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
     };
     // Add a delay or condition to control the transmission frequency
+
+
     HAL_Delay(100);  // Delay for 1 second, adjust as needed
     /* USER CODE BEGIN 3 */
   }
