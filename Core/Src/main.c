@@ -152,10 +152,10 @@ uint8_t reset_value[2] = {0x80, 0x00};
 uint8_t active_value[2] = {0x00, 0x00};
 
 // DIVIDER AND CLOCK SOURCE
-uint8_t DIVIDER_DEFAULT_CH0[2] = {0x10, 0x0E};
-uint8_t DIVIDER_DEFAULT_CH1[2] = {0x10, 0x0C};
-uint8_t DIVIDER_DEFAULT_CH2[2] = {0x10, 0x12};
-uint8_t DIVIDER_DEFAULT_CH3[2] = {0x10, 0x0C};
+uint8_t DIVIDER_DEFAULT_CH0[2] = {0x10, 0x0E}; //14
+uint8_t DIVIDER_DEFAULT_CH1[2] = {0x10, 0x0E}; //14
+uint8_t DIVIDER_DEFAULT_CH2[2] = {0x10, 0x0E}; //14
+uint8_t DIVIDER_DEFAULT_CH3[2] = {0x10, 0x0E};
 
 uint8_t DRIVE_CURRENT_DEFAULT[2] = {0x8C, 0x40};
 
@@ -444,11 +444,13 @@ int main(void)
     // Data transform for output LED
     int integerValue_MSB_CH0 = hex_to_dec(MSB_CH0);
     int integerValue_MSB_CH1 = hex_to_dec(MSB_CH1);
+    int integerValue_MSB_CH2 = hex_to_dec(MSB_CH2);
+    int integerValue_MSB_CH3 = hex_to_dec(MSB_CH3);
 
     // Transmit the register value via UART
     Transmit_Data(MSB_CH0, LSB_CH0, CH0_FIN_DIVIDER, CH0_OFFSET, MSB_CH1, LSB_CH1, CH1_FIN_DIVIDER, CH1_OFFSET, MSB_CH2, LSB_CH2, CH2_FIN_DIVIDER, CH2_OFFSET, MSB_CH3, LSB_CH3, CH3_FIN_DIVIDER, CH3_OFFSET);
 
-    if (integerValue_MSB_CH0 > 3700 || integerValue_MSB_CH1 > 3700 ){
+    if (MSB_CH0 > 3750 || MSB_CH2 > 3360 ){
     	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
     }else{
     	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);

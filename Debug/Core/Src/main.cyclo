@@ -8,8 +8,8 @@
 ../Core/Src/main.c:243:7:calculate_inductance	2
 ../Core/Src/main.c:254:6:Transmit_Data	3
 ../Core/Src/main.c:332:5:main	3
-../Core/Src/main.c:469:6:SystemClock_Config	3
-../Core/Src/main.c:516:13:MX_I2C1_Init	2
-../Core/Src/main.c:538:13:MX_USART2_UART_Init	2
-../Core/Src/main.c:559:13:MX_GPIO_Init	1
-../Core/Src/main.c:594:6:Error_Handler	1
+../Core/Src/main.c:471:6:SystemClock_Config	3
+../Core/Src/main.c:518:13:MX_I2C1_Init	2
+../Core/Src/main.c:540:13:MX_USART2_UART_Init	2
+../Core/Src/main.c:561:13:MX_GPIO_Init	1
+../Core/Src/main.c:596:6:Error_Handler	1
