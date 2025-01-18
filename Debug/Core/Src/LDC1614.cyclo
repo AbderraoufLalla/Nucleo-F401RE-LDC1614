@@ -1,0 +1,15 @@
+../Core/Src/LDC1614.c:190:6:LDC1614_ReadRegister	1
+../Core/Src/LDC1614.c:194:6:LDC1614_WriteRegister	1
+../Core/Src/LDC1614.c:199:5:hex_to_dec	1
+../Core/Src/LDC1614.c:206:6:LDC1614_WriteRegister_LSB	1
+../Core/Src/LDC1614.c:219:10:calculate_raw_code	2
+../Core/Src/LDC1614.c:231:5:calculate_frequency_supply	1
+../Core/Src/LDC1614.c:236:7:calculate_frequency_sensor	1
+../Core/Src/LDC1614.c:245:7:calculate_inductance	2
+../Core/Src/LDC1614.c:256:6:Transmit_Data	3
+../Core/Src/LDC1614.c:331:5:main	3
+../Core/Src/LDC1614.c:470:6:SystemClock_Config	3
+../Core/Src/LDC1614.c:517:13:MX_I2C1_Init	2
+../Core/Src/LDC1614.c:539:13:MX_USART2_UART_Init	2
+../Core/Src/LDC1614.c:560:13:MX_GPIO_Init	1
+../Core/Src/LDC1614.c:595:6:Error_Handler	1

@@ -1,0 +1,15 @@
+../Core/Src/LDC1614.c:190:6:LDC1614_ReadRegister	32	static
+../Core/Src/LDC1614.c:194:6:LDC1614_WriteRegister	32	static
+../Core/Src/LDC1614.c:199:5:hex_to_dec	32	static
+../Core/Src/LDC1614.c:206:6:LDC1614_WriteRegister_LSB	40	static
+../Core/Src/LDC1614.c:219:10:calculate_raw_code	24	static
+../Core/Src/LDC1614.c:231:5:calculate_frequency_supply	24	static
+../Core/Src/LDC1614.c:236:7:calculate_frequency_sensor	40	static
+../Core/Src/LDC1614.c:245:7:calculate_inductance	48	static
+../Core/Src/LDC1614.c:256:6:Transmit_Data	1216	static
+../Core/Src/LDC1614.c:331:5:main	112	static
+../Core/Src/LDC1614.c:470:6:SystemClock_Config	88	static
+../Core/Src/LDC1614.c:517:13:MX_I2C1_Init	8	static
+../Core/Src/LDC1614.c:539:13:MX_USART2_UART_Init	8	static
+../Core/Src/LDC1614.c:560:13:MX_GPIO_Init	48	static
+../Core/Src/LDC1614.c:595:6:Error_Handler	4	static,ignoring_inline_asm

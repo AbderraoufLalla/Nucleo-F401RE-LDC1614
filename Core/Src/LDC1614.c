@@ -159,6 +159,8 @@ uint8_t DIVIDER_DEFAULT_CH3[2] = {0x10, 0x0E};
 
 uint8_t DRIVE_CURRENT_DEFAULT[2] = {0x8C, 0x40};
 
+// Sensor calculation using 43.4 MHz // PS: the f_supply is in KHz
+float reference_frequency = 43.4;
 
 /* USER CODE BEGIN PV */
 
@@ -260,9 +262,6 @@ void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t CH0_FIN_DIVIDER,
 
     transmit_count++;  // Increment the counter each time data is transmitted
 
-    // Sensor calculation using 43.4 MHz // PS: the f_supply is in KHz
-    float reference_frequency = 43.4;
-
     // Mask MSB values to 12 bits
     uint16_t MSB_CH0_masked = MSB_CH0 & 0x0FFF;
     uint16_t MSB_CH1_masked = MSB_CH1 & 0x0FFF;
@@ -309,11 +308,11 @@ void Transmit_Data(uint16_t MSB_CH0, uint16_t LSB_CH0, uint16_t CH0_FIN_DIVIDER,
                        "CH2 - MSB:%d LSB:%d F_DIV:%d f_supply:%i| "
                        "CH3 - MSB:%d LSB:%d F_DIV:%d f_supply:%i| "
                        "f_sensor_CH2:%li L_CH2:%li - %i\n\r",
-                       MSB_CH0_masked, LSB_CH0, CH0_FIN_DIVIDER_masked, f_supply_CH0,
+                       MSB_CH0_masked, LSB_CH0, CH0_FIN_DIVIDER_masked, f_sensor_CH0,
                        MSB_CH1_masked, LSB_CH1, CH1_FIN_DIVIDER_masked, f_supply_CH1,
                        MSB_CH2_masked, LSB_CH2, CH2_FIN_DIVIDER_masked, f_supply_CH2,
                        MSB_CH3_masked, LSB_CH3, CH3_FIN_DIVIDER_masked, f_supply_CH3,
-                       f_sensor_CH2, L_CH2, transmit_count);
+                       f_sensor_CH2, L_CH2, raw_code_CH0);
 
    if (len < 0 || len >= sizeof(msg)) {
         // Handle snprintf error or buffer overflow
@@ -383,7 +382,7 @@ int main(void)
   LDC1614_WriteRegister(CONFIG_reg, clk_src, 2);
 
   //Number of channels configuration for the LDC1614 & Deglitch
-  LDC1614_WriteRegister(MUX_reg, config_3Channels_3MHz, 2);
+  LDC1614_WriteRegister(MUX_reg, config_2Channels_3MHz, 2);
 
   LDC1614_WriteRegister(DRIVE_CURRENT_CH0, DRIVE_CURRENT_DEFAULT, 2);
   LDC1614_WriteRegister(DRIVE_CURRENT_CH1, DRIVE_CURRENT_DEFAULT, 2);
@@ -458,7 +457,7 @@ int main(void)
     // Add a delay or condition to control the transmission frequency
 
 
-    HAL_Delay(100);  // Delay for 1 second, adjust as needed
+    HAL_Delay(1000);  // Delay for 1 second, adjust as needed
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
